@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spotify OAuth Flow</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #1DB954;
+    --green-dim: #1aa34a22;
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --text-primary: #f0f0f0;
+    --text-secondary: #888;
+    --text-muted: #555;
+    --script: #1DB954;
+    --browser: #3b82f6;
+    --spotify: #1DB954;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 48px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .doc-wrapper {
+    width: 100%;
+    max-width: 860px;
+  }
+
+  /* Header */
+  .doc-header {
+    margin-bottom: 48px;
+  }
+
+  .doc-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--green);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+
+  .doc-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-family: var(--mono);
+  }
+
+  /* Diagram container */
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+
+  .diagram-inner {
+    padding: 40px 40px 48px;
+    overflow-x: auto;
+  }
+
+  /* Participants row */
+  .participants {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0;
+    position: relative;
+  }
+
+  .participant-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+  }
+
+  .participant-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 20px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    border: 1.5px solid;
+    z-index: 2;
+    position: relative;
+    white-space: nowrap;
+  }
+
+  .participant-box.script  { background: #0d1f14; border-color: var(--green);   color: var(--green); }
+  .participant-box.browser { background: #0d1320; border-color: #3b82f6;          color: #3b82f6; }
+  .participant-box.spotify { background: #0d1f14; border-color: #22c55e;          color: #22c55e; }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .script  .dot { background: var(--green); }
+  .browser .dot { background: #3b82f6; }
+  .spotify .dot { background: #22c55e; }
+
+  /* Lifeline area */
+  .lifelines {
+    display: flex;
+    position: relative;
+    min-height: 520px;
+    margin-top: 0;
+  }
+
+  .lifeline-col {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    position: relative;
+  }
+
+  .lifeline {
+    width: 1.5px;
+    background: repeating-linear-gradient(to bottom, var(--border) 0px, var(--border) 6px, transparent 6px, transparent 12px);
+    position: absolute;
+    top: 0;
+    bottom: 0;
+  }
+
+  .lifeline.script  { background: repeating-linear-gradient(to bottom, #1DB95444 0px, #1DB95444 6px, transparent 6px, transparent 12px); }
+  .lifeline.browser { background: repeating-linear-gradient(to bottom, #3b82f644 0px, #3b82f644 6px, transparent 6px, transparent 12px); }
+  .lifeline.spotify { background: repeating-linear-gradient(to bottom, #22c55e44 0px, #22c55e44 6px, transparent 6px, transparent 12px); }
+
+  /* Messages layer */
+  .messages {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+  }
+
+  /* Each row is a step */
+  .step {
+    position: absolute;
+    left: 0; right: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Arrow line */
+  .arrow-line {
+    position: absolute;
+    height: 1.5px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .arrow-line.solid { background: currentColor; }
+  .arrow-line.dashed {
+    background: repeating-linear-gradient(to right, currentColor 0px, currentColor 5px, transparent 5px, transparent 9px);
+  }
+
+  /* Arrowheads via border trick */
+  .arrowhead {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0; height: 0;
+  }
+  .arrowhead.right {
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 8px solid currentColor;
+  }
+  .arrowhead.left {
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-right: 8px solid currentColor;
+  }
+
+  /* Message label */
+  .msg-label {
+    position: absolute;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    top: 50%;
+    transform: translateY(-100%) translateY(-4px);
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+
+  /* Note boxes */
+  .note-box {
+    position: absolute;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #a0a0a0;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-left: 3px solid;
+    padding: 6px 12px;
+    border-radius: 0 4px 4px 0;
+    white-space: nowrap;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  /* Bottom participant mirrors */
+  .participant-box-bottom {
+    margin-top: 0;
+  }
+
+  /* Footer / legend */
+  .legend {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    padding: 16px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .legend-line {
+    width: 28px;
+    height: 1.5px;
+  }
+  .legend-line.solid { background: var(--text-secondary); }
+  .legend-line.dashed {
+    background: repeating-linear-gradient(to right, var(--text-secondary) 0px, var(--text-secondary) 5px, transparent 5px, transparent 9px);
+  }
+
+  /* Step numbers */
+  .step-num {
+    position: absolute;
+    left: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    top: 50%;
+    transform: translateY(-50%);
+    user-select: none;
+  }
+
+  /* Description table */
+  .desc-section {
+    margin-top: 8px;
+  }
+
+  .desc-section h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .step-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .step-table tr {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .step-table tr:last-child {
+    border-bottom: none;
+  }
+
+  .step-table td {
+    padding: 12px 8px;
+    vertical-align: top;
+    font-size: 13.5px;
+    line-height: 1.6;
+  }
+
+  .step-table .td-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--green);
+    width: 32px;
+    padding-top: 14px;
+  }
+
+  .step-table .td-code {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    width: 220px;
+    padding-top: 14px;
+  }
+
+  .step-table .td-desc {
+    color: #c0c0c0;
+    font-family: var(--sans);
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: #1e1e1e;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #a0d0a0;
+  }
+
+  @media print {
+    body { background: white; color: black; padding: 24px; }
+    .diagram { border-color: #ccc; background: white; }
+  }
+</style>
+</head>
+<body>
+<div class="doc-wrapper">
+
+  <div class="doc-header">
+    <div class="doc-label">OAuth 2.0 · Authorization Code Flow</div>
+    <h1>Spotify OAuth Flow</h1>
+    <div class="doc-subtitle">script → browser → spotify</div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-inner">
+
+      <!-- Participants (top) -->
+      <div class="participants">
+        <div class="participant-col">
+          <div class="participant-box script"><span class="dot"></span>script</div>
+        </div>
+        <div class="participant-col">
+          <div class="participant-box browser"><span class="dot"></span>browser</div>
+        </div>
+        <div class="participant-col">
+          <div class="participant-box spotify"><span class="dot"></span>spotify</div>
+        </div>
+      </div>
+
+      <!-- Lifelines + messages -->
+      <div style="position:relative;">
+        <!-- Lifelines -->
+        <div class="lifelines">
+          <div class="lifeline-col"><div class="lifeline script"></div></div>
+          <div class="lifeline-col"><div class="lifeline browser"></div></div>
+          <div class="lifeline-col"><div class="lifeline spotify"></div></div>
+        </div>
+
+        <!-- SVG for arrows overlaid on top -->
+        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible;" preserveAspectRatio="none" viewBox="0 0 780 520" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="ah-green" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto">
+              <path d="M0,0.5 L7,3.5 L0,6.5" fill="none" stroke="#1DB954" stroke-width="1.5" stroke-linejoin="round"/>
+            </marker>
+            <marker id="ah-blue" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto">
+              <path d="M0,0.5 L7,3.5 L0,6.5" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linejoin="round"/>
+            </marker>
+            <marker id="ah-teal" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto">
+              <path d="M0,0.5 L7,3.5 L0,6.5" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+
+          <!-- Column centers: script=130, browser=390, spotify=650 -->
+          <!-- Step heights: start at y=52, gap=74 -->
+
+          <!-- Step 1: script → browser  webbrowser.open(login URL) -->
+          <line x1="136" y1="62" x2="382" y2="62" stroke="#1DB954" stroke-width="1.5" marker-end="url(#ah-green)"/>
+          <text x="258" y="54" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" fill="#1DB954" font-weight="500">webbrowser.open(login URL)</text>
+          <text x="20" y="66" font-family="'JetBrains Mono',monospace" font-size="10" fill="#444">1</text>
+
+          <!-- Step 2: browser → spotify  GET /authorize -->
+          <line x1="396" y1="136" x2="642" y2="136" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+          <text x="518" y="128" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" fill="#3b82f6" font-weight="500">GET /authorize</text>
+          <text x="20" y="140" font-family="'JetBrains Mono',monospace" font-size="10" fill="#444">2</text>
+
+          <!-- Note right of spotify: user logs in -->
+          <rect x="658" y="152" width="110" height="28" rx="3" fill="#141f14" stroke="#22c55e44" stroke-width="1"/>
+          <line x1="656" y1="152" x2="656" y2="180" stroke="#22c55e" stroke-width="2.5"/>
+          <text x="670" y="170" font-family="'JetBrains Mono',monospace" font-size="10.5" fill="#888">user logs in</text>
+
+          <!-- Step 3: spotify → browser  redirect localhost:8888?code=... -->
+          <line x1="644" y1="210" x2="402" y2="210" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#ah-teal)"/>
+          <text x="518" y="202" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" fill="#22c55e" font-weight="500">redirect localhost:8888?code=…</text>
+          <text x="20" y="214" font-family="'JetBrains Mono',monospace" font-size="10" fill="#444">3</text>
+
+          <!-- Step 4: browser → script  GET /callback?code=... -->
+          <line x1="384" y1="284" x2="142" y2="284" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#ah-blue)"/>
+          <text x="258" y="276" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" fill="#3b82f6" font-weight="500">GET /callback?code=…</text>
+          <text x="20" y="288" font-family="'JetBrains Mono',monospace" font-size="10" fill="#444">4</text>
+
+          <!-- Note left of script: code captured -->
+          <rect x="12" y="298" width="100" height="28" rx="3" fill="#141814" stroke="#1DB95444" stroke-width="1"/>
+          <line x1="114" y1="298" x2="114" y2="326" stroke="#1DB954" stroke-width="2.5"/>
+          <text x="24" y="316" font-family="'JetBrains Mono',monospace" font-size="10.5" fill="#888">code captured</text>
+
+          <!-- Step 5: script → spotify  POST /api/token (code) -->
+          <line x1="136" y1="358" x2="642" y2="358" stroke="#1DB954" stroke-width="1.5" marker-end="url(#ah-green)"/>
+          <text x="390" y="350" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" fill="#1DB954" font-weight="500">POST /api/token (code)</text>
+          <text x="20" y="362" font-family="'JetBrains Mono',monospace" font-size="10" fill="#444">5</text>
+
+          <!-- Step 6: spotify → script  access_token -->
+          <line x1="644" y1="432" x2="142" y2="432" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#ah-teal)"/>
+          <text x="390" y="424" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" fill="#22c55e" font-weight="500">access_token</text>
+          <text x="20" y="436" font-family="'JetBrains Mono',monospace" font-size="10" fill="#444">6</text>
+
+        </svg>
+      </div>
+
+      <!-- Participants (bottom mirrors) -->
+      <div class="participants" style="margin-top:0">
+        <div class="participant-col">
+          <div class="participant-box script participant-box-bottom"><span class="dot"></span>script</div>
+        </div>
+        <div class="participant-col">
+          <div class="participant-box browser participant-box-bottom"><span class="dot"></span>browser</div>
+        </div>
+        <div class="participant-col">
+          <div class="participant-box spotify participant-box-bottom"><span class="dot"></span>spotify</div>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-line solid"></div>
+          <span>request / call</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line dashed"></div>
+          <span>response / redirect</span>
+        </div>
+        <div class="legend-item" style="color:#1DB954">
+          <span class="dot" style="background:#1DB954;width:7px;height:7px;border-radius:50%;display:inline-block"></span>
+          <span>script</span>
+        </div>
+        <div class="legend-item" style="color:#3b82f6">
+          <span class="dot" style="background:#3b82f6;width:7px;height:7px;border-radius:50%;display:inline-block"></span>
+          <span>browser</span>
+        </div>
+        <div class="legend-item" style="color:#22c55e">
+          <span class="dot" style="background:#22c55e;width:7px;height:7px;border-radius:50%;display:inline-block"></span>
+          <span>spotify</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Step descriptions -->
+  <div class="desc-section">
+    <h2>Steps</h2>
+    <table class="step-table">
+      <tr>
+        <td class="td-num">1</td>
+        <td class="td-code">webbrowser.open()</td>
+        <td class="td-desc">The script constructs the <code>/authorize</code> URL with <code>client_id</code>, <code>redirect_uri</code>, <code>scope</code>, and <code>state</code>, then opens it in the system browser.</td>
+      </tr>
+      <tr>
+        <td class="td-num">2</td>
+        <td class="td-code">GET /authorize</td>
+        <td class="td-desc">The browser sends the authorization request to Spotify. Spotify renders its login and consent screen; the user authenticates and approves the requested scopes.</td>
+      </tr>
+      <tr>
+        <td class="td-num">3</td>
+        <td class="td-code">redirect ?code=…</td>
+        <td class="td-desc">After consent, Spotify redirects the browser to <code>localhost:8888/callback</code> with a short-lived authorization code in the query string.</td>
+      </tr>
+      <tr>
+        <td class="td-num">4</td>
+        <td class="td-code">GET /callback</td>
+        <td class="td-desc">The local HTTP server running inside the script catches the callback request and extracts the <code>code</code> parameter from the URL.</td>
+      </tr>
+      <tr>
+        <td class="td-num">5</td>
+        <td class="td-code">POST /api/token</td>
+        <td class="td-desc">The script exchanges the authorization code for tokens by POSTing <code>client_id</code>, <code>client_secret</code>, <code>redirect_uri</code>, and <code>grant_type=authorization_code</code>.</td>
+      </tr>
+      <tr>
+        <td class="td-num">6</td>
+        <td class="td-code">access_token</td>
+        <td class="td-desc">Spotify returns <code>access_token</code>, <code>refresh_token</code>, <code>expires_in</code>, and <code>token_type</code>. Store the refresh token — it avoids repeating the full flow on expiry.</td>
+      </tr>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

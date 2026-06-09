@@ -33,7 +33,7 @@ class Spotify:
     create_playlist_url = "https://api.spotify.com/v1/me/playlists"
     search_song_url = "https://api.spotify.com/v1/search?"
 
-    TOKEN_PATH = "Day46/token.json"
+    TOKEN_PATH = os.path.join(os.path.dirname(__file__), "token.json")
     SLEEP = 5
     TIMEOUT = 10
 
@@ -190,6 +190,8 @@ class Spotify:
                 print(f"Transient error {error.response.status_code}. Retrying... ({retries} left")
                 time.sleep(Spotify.SLEEP)
                 return self._request_with_retry(method, url, retries - 1, **kwargs)
+
+            print(f"Whoops! Error {error.response.status_code}.'{error.response.json()}'")
             raise  # immediately re-raise 400/401/404
 
     @staticmethod
@@ -378,7 +380,7 @@ class Spotify:
         # Save new access_token into file
         Spotify._save_tokens(json_response=response_data)
 
-        return response_data
+        return response_data.get("access_token")
 
     @staticmethod
     def _save_tokens(json_response: dict):
@@ -395,6 +397,5 @@ class Spotify:
             print("File not found. Creating a new token file.")
             with open(Spotify.TOKEN_PATH, "x") as f:
                 json.dump(obj=json_response, fp=f, indent=2)
-
 
 

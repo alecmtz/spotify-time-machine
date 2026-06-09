@@ -16,7 +16,7 @@ A Python CLI tool that generates a Spotify playlist of the top 50 songs from any
 
 ## Features
 
-- **Manual OAuth 2.0 Authorization Code Flow** — implemented from scratch without third-party Spotify wrappers ([see flow diagram](spotify-oauth-flow.html))
+- **Manual OAuth 2.0 Authorization Code Flow** — implemented from scratch without third-party Spotify wrappers ([see flow diagram](https://alecmtz.github.io/spotify-time-machine/spotify-oauth-flow.html))
 - **Automatic token refresh** — persists access and refresh tokens to disk; refreshes silently when expired
 - **Retry logic** — handles transient API errors (429, 502, 503, 504) with configurable retries and sleep delay
 - **Date normalization** — adjusts any input date to the nearest Saturday (how weekly charts are indexed)
@@ -95,7 +95,6 @@ Which year do you want to travel to? Type the date in this format YYYY-MM-DD: 19
 
 - Dates must be in `YYYY-MM-DD` format, between October 1976 and today. Type `X` to exit.
 - Songs not available on Spotify are skipped with a log message.
-- `token.json` and `.env` are gitignored — keep them out of version control.
 ---
 
 ## Example Output

@@ -55,6 +55,7 @@ def date_format(date: str):
 
 
 def main():
+    # ********** STEP 1 **********
     # Initialize Spotify
     spotify = Spotify()
 
@@ -70,28 +71,17 @@ def main():
             print("Goodbye! ;)")
             sys.exit(0)
 
+    # ********** STEP 2 **********
     # Get the top 50 songs from the website using the date range
     top_songs = music_charts_archive.time_machine(date=user_answer)
 
+    # Display songs
     count = 0
     for song in top_songs:
         count += 1
         print(f"{count}. ", song)
 
-    # Create playlist
-    new_playlist_name = f"Time machine week of: {user_answer}"
-    playlist_metadata = spotify.create_playlist(name=new_playlist_name)
-
-    # Get metadata
-    playlist_name = playlist_metadata.get("name")
-    playlist_id = playlist_metadata.get("id")
-
-    # Add new playlist to the catalog
-    save_playlist(filepath=CATALOG_FILE_PATH, key=playlist_name, value=playlist_id)
-
-    # Read catalog and get the playlist named "Testing with songs"
-    playlist_id = read_catalog().get(new_playlist_name)
-
+    # ********** STEP 3 **********
     # Call spotify to search the songs URI
     spotify_songs_uri = []
     count = 0
@@ -105,6 +95,21 @@ def main():
             print(f"Get song URI from spotify: {count}/{len(top_songs)}")
 
     print(f"Total songs URI: {len(spotify_songs_uri)}")
+
+    # ********** STEP 4 **********
+    # Create playlist
+    new_playlist_name = f"Time machine week of: {user_answer}"
+    playlist_metadata = spotify.create_playlist(name=new_playlist_name)
+
+    # Get metadata
+    playlist_name = playlist_metadata.get("name")
+    playlist_id = playlist_metadata.get("id")
+
+    # Add new playlist to the local catalog
+    save_playlist(filepath=CATALOG_FILE_PATH, key=playlist_name, value=playlist_id)
+
+    # Read catalog and get the playlist
+    playlist_id = read_catalog().get(new_playlist_name)
 
     # Using the songs URI add them to the playlist
     spotify.add_song_to_playlist(playlist_id=playlist_id, spotify_uri=spotify_songs_uri)
